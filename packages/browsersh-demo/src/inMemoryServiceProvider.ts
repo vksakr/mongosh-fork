@@ -1,62 +1,32 @@
-import ReactDOM from 'react-dom';
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  css,
-  ThemeProvider,
-  Theme,
-  injectGlobal,
-} from '@mongodb-js/compass-components';
-import type { Document } from '@mongosh/service-provider-core';
-import type { ShellOutputEntry } from './components/shell-output-line';
-import { IframeRuntime } from './iframe-runtime';
-import { Shell } from './index';
-import type { ServiceProviderFindCursor } from '@mongosh/service-provider-core';
 import type {
-  ConnectionInfo,
-  ListDatabasesOptions,
-  ReadConcern,
-  ReadPreference,
-  WriteConcern,
+  AggregateOptions,
+  CountDocumentsOptions,
+  CountOptions,
   DbOptions,
   DeleteOptions,
   DeleteResult,
-  RunCommandOptions,
-  InsertOneOptions,
-  InsertOneResult,
-  UpdateOptions,
-  UpdateResult,
-  AggregateOptions,
-  FindOptions,
-  CountDocumentsOptions,
-  CountOptions,
+  Document,
   EstimatedDocumentCountOptions,
+  FindOneAndDeleteOptions,
+  FindOneAndReplaceOptions,
+  FindOneAndUpdateOptions,
+  FindOptions,
   InsertManyOptions,
   InsertManyResult,
+  InsertOneOptions,
+  InsertOneResult,
+  ListDatabasesOptions,
+  ReadConcern,
+  ReadPreference,
   ReplaceOptions,
-  FindOneAndDeleteOptions,
-  FindOneAndUpdateOptions,
-  FindOneAndReplaceOptions,
-  DropDatabaseOptions,
+  RunCommandOptions,
+  UpdateOptions,
+  UpdateResult,
+  WriteConcern,
 } from '@mongosh/service-provider-core';
+import type { ServiceProviderFindCursor } from '@mongosh/service-provider-core';
+import type { ConnectionInfo } from '@mongosh/service-provider-core';
 import * as bson from 'bson';
-
-injectGlobal({
-  body: {
-    margin: 0,
-  },
-  '*': {
-    boxSizing: 'border-box',
-  },
-});
-
-const appContainer = css({
-  width: '100vw',
-  height: '100vh',
-});
-
-const shellContainer = css({
-  height: '100%',
-});
 
 type StoredDocument = Record<string, any>;
 
@@ -64,17 +34,13 @@ type CollectionStore = Map<string, StoredDocument[]>;
 
 type DatabaseStore = Map<string, CollectionStore>;
 
-const cloneDoc = (doc: StoredDocument): StoredDocument => {
-  return { ...doc };
-};
+const cloneDoc = (doc: StoredDocument): StoredDocument => ({ ...doc });
 
 const matchesFilter = (doc: StoredDocument, filter: Document = {}): boolean => {
-  return Object.entries(filter).every(([key, value]) => {
-    return doc[key] === value;
-  });
+  return Object.entries(filter).every(([key, value]) => doc[key] === value);
 };
 
-class InMemoryCursor implements ServiceProviderFindCursor<StoredDocument> {
+export class InMemoryCursor implements ServiceProviderFindCursor<StoredDocument> {
   private docs: StoredDocument[];
   private index = 0;
   private limitCount: number | null = null;
@@ -87,10 +53,7 @@ class InMemoryCursor implements ServiceProviderFindCursor<StoredDocument> {
 
   private getVisibleDocs(): StoredDocument[] {
     const sliced = this.docs.slice(this.skipCount);
-    if (this.limitCount === null) {
-      return sliced;
-    }
-    return sliced.slice(0, this.limitCount);
+    return this.limitCount === null ? sliced : sliced.slice(0, this.limitCount);
   }
 
   private advance(): StoredDocument | null {
@@ -134,11 +97,11 @@ class InMemoryCursor implements ServiceProviderFindCursor<StoredDocument> {
   }
 
   batchSize(): void {
-    /* not needed for in-memory cursor */
+    /* no-op */
   }
 
   maxTimeMS(): void {
-    /* not needed for in-memory cursor */
+    /* no-op */
   }
 
   bufferedCount(): number {
@@ -242,7 +205,7 @@ class InMemoryCursor implements ServiceProviderFindCursor<StoredDocument> {
   }
 }
 
-class InMemoryServiceProvider {
+export class InMemoryServiceProvider {
   platform = 'Browser' as const;
   initialDb = 'test';
   bsonLibrary = bson as unknown as typeof bson;
@@ -250,10 +213,7 @@ class InMemoryServiceProvider {
     ['test', new Map([['items', []]])],
   ]);
 
-  private ensureCollection(
-    database: string,
-    collection: string
-  ): StoredDocument[] {
+  private ensureCollection(database: string, collection: string): StoredDocument[] {
     if (!this.databases.has(database)) {
       this.databases.set(database, new Map());
     }
@@ -439,30 +399,6 @@ class InMemoryServiceProvider {
     return { acknowledged: true, deletedCount } as DeleteResult;
   }
 
-  async runCommand(
-    _database: string,
-    _spec: Document,
-    _options: RunCommandOptions
-  ): Promise<Document> {
-    return { ok: 1 };
-  }
-
-  async runCommandWithCheck(
-    database: string,
-    spec: Document,
-    options: RunCommandOptions
-  ): Promise<Document> {
-    return this.runCommand(database, spec, options);
-  }
-
-  runCursorCommand(
-    _database: string,
-    _spec: Document,
-    _options: Document
-  ): ServiceProviderFindCursor<StoredDocument> {
-    return new InMemoryCursor([]);
-  }
-
   async updateOne(
     database: string,
     collection: string,
@@ -617,14 +553,6 @@ class InMemoryServiceProvider {
     return new InMemoryCursor(filtered.map((doc) => cloneDoc(doc)));
   }
 
-  async dropDatabase(
-    database: string,
-    _options: DropDatabaseOptions
-  ): Promise<Document> {
-    this.databases.delete(database);
-    return { ok: 1 };
-  }
-
   async aggregateDb(
     database: string,
     pipeline: Document[] = [],
@@ -645,20 +573,28 @@ class InMemoryServiceProvider {
     return values as unknown as Document;
   }
 
-  async getIndexes(): Promise<Document[]> {
-    return [];
+  async runCommand(
+    _database: string,
+    _spec: Document,
+    _options: RunCommandOptions
+  ): Promise<Document> {
+    return { ok: 1 };
   }
 
-  readPreferenceFromOptions(_options?: Document): ReadPreference {
-    return this.getReadPreference();
+  async runCommandWithCheck(
+    database: string,
+    spec: Document,
+    options: RunCommandOptions
+  ): Promise<Document> {
+    return this.runCommand(database, spec, options);
   }
 
-  watch(): never {
-    throw new Error('Change streams are not supported in the in-memory demo.');
-  }
-
-  async getSearchIndexes(): Promise<Document[]> {
-    return [];
+  runCursorCommand(
+    _database: string,
+    _spec: Document,
+    _options: Document
+  ): ServiceProviderFindCursor<StoredDocument> {
+    return new InMemoryCursor([]);
   }
 
   async close(): Promise<void> {
@@ -687,6 +623,10 @@ class InMemoryServiceProvider {
     return { mode: 'primary' } as ReadPreference;
   }
 
+  readPreferenceFromOptions(_options?: Document): ReadPreference {
+    return this.getReadPreference();
+  }
+
   getReadConcern(): ReadConcern | undefined {
     return undefined;
   }
@@ -699,7 +639,7 @@ class InMemoryServiceProvider {
     /* no-op */
   }
 
-  startSession(): any {
+  startSession(): { endSession: () => Promise<void> } {
     return {
       endSession: async () => undefined,
     };
@@ -709,51 +649,3 @@ class InMemoryServiceProvider {
     return undefined;
   }
 }
-
-const ShellApp: React.FunctionComponent = () => {
-  const runtime = useMemo(() => {
-    // IframeRuntime spins up an isolated OpenContextRuntime in a sandboxed iframe.
-    return new IframeRuntime(new InMemoryServiceProvider() as any);
-  }, []);
-
-  const [output, setOutput] = useState<ShellOutputEntry[]>([
-    {
-      key: 'welcome',
-      format: 'output',
-      value: {
-        message:
-          'Type mongosh CRUD commands like db.items.insertOne({ name: "apple" }) or db.items.find()',
-      },
-    },
-  ]);
-  const [history, setHistory] = useState<string[]>([]);
-  const [isOperationInProgress, setIsOperationInProgress] = useState(false);
-
-  useEffect(() => {
-    void runtime.initialize();
-    return () => {
-      void runtime.destroy();
-    };
-  }, [runtime]);
-
-  return (
-    <div className={appContainer}>
-      <ThemeProvider theme={{ theme: Theme.Light, enabled: true }}>
-        <div className={shellContainer}>
-          <Shell
-            runtime={runtime}
-            output={output}
-            history={history}
-            isOperationInProgress={isOperationInProgress}
-            onOutputChanged={setOutput}
-            onHistoryChanged={setHistory}
-            onOperationStarted={() => setIsOperationInProgress(true)}
-            onOperationEnd={() => setIsOperationInProgress(false)}
-          />
-        </div>
-      </ThemeProvider>
-    </div>
-  );
-};
-
-ReactDOM.render(<ShellApp />, document.body);
