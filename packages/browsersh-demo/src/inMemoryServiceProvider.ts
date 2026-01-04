@@ -623,7 +623,7 @@ export class InMemoryServiceProvider {
     return { mode: 'primary' } as ReadPreference;
   }
 
-  readPreferenceFromOptions(): ReadPreference {
+  readPreferenceFromOptions(_options?: Document): ReadPreference {
     return this.getReadPreference();
   }
 

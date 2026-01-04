@@ -1,23 +1,43 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ThemeProvider, Theme, css } from '@mongodb-js/compass-components';
 import { Shell, IframeRuntime } from '@mongosh/browser-repl';
 import { InMemoryServiceProvider } from './inMemoryServiceProvider';
 
-const appContainer = css({
-  height: '100vh',
-  width: '100vw',
-});
+const stringifyOutputValue = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value && typeof value === 'object') {
+    if ('message' in value && typeof value.message === 'string') {
+      return `Error: ${value.message}`;
+    }
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
 
-const shellContainer = css({
-  height: '100%',
-});
+type OutputEntry = {
+  key: string | number;
+  format: string;
+  value: unknown;
+  type?: string | null;
+};
+
+const formatEntries = (entries: OutputEntry[]) => {
+  return entries
+    .filter((entry) => entry.format !== 'input')
+    .map((entry) => stringifyOutputValue(entry.value))
+    .join('\n\n');
+};
 
 export const App: React.FC = () => {
   const runtime = useMemo(() => {
     return new IframeRuntime(new InMemoryServiceProvider() as any);
   }, []);
 
-  const [output, setOutput] = useState<any[]>([
+  const [output, setOutput] = useState<OutputEntry[]>([
     {
       key: 'welcome',
       format: 'output',
@@ -30,6 +50,10 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<string[]>([]);
   const [isOperationInProgress, setIsOperationInProgress] = useState(false);
 
+  const handleOutputChanged = (entries: OutputEntry[]) => {
+    setOutput(entries);
+  };
+
   useEffect(() => {
     void runtime.initialize();
     return () => {
@@ -38,21 +62,23 @@ export const App: React.FC = () => {
   }, [runtime]);
 
   return (
-    <div className={appContainer}>
-      <ThemeProvider theme={{ theme: Theme.Light, enabled: true }}>
-        <div className={shellContainer}>
-          <Shell
-            runtime={runtime}
-            output={output}
-            history={history}
-            isOperationInProgress={isOperationInProgress}
-            onOutputChanged={setOutput}
-            onHistoryChanged={setHistory}
-            onOperationStarted={() => setIsOperationInProgress(true)}
-            onOperationEnd={() => setIsOperationInProgress(false)}
-          />
-        </div>
-      </ThemeProvider>
+    <div className="app">
+      <div className="input-panel shell-output-hidden">
+        <Shell
+          runtime={runtime}
+          output={output}
+          history={history}
+          isOperationInProgress={isOperationInProgress}
+          onOutputChanged={handleOutputChanged}
+          onHistoryChanged={setHistory}
+          onOperationStarted={() => setIsOperationInProgress(true)}
+          onOperationEnd={() => setIsOperationInProgress(false)}
+        />
+      </div>
+      <div className="output-panel">
+        <h2>Result</h2>
+        <pre>{formatEntries(output)}</pre>
+      </div>
     </div>
   );
 };

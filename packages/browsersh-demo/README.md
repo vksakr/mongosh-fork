@@ -1,6 +1,7 @@
 # BrowserSH Demo
 
 Minimal React + TypeScript demo that runs the mongosh Browser REPL UI entirely in the browser.
+Input is provided through the Shell component, while evaluation results are rendered as plain text.
 
 ## Development
 

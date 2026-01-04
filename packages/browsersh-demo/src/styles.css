@@ -4,3 +4,31 @@ body,
   height: 100%;
   margin: 0;
 }
+
+body {
+  font-family: sans-serif;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100%;
+}
+
+.input-panel {
+  border-right: 1px solid #ddd;
+  overflow: hidden;
+}
+
+.output-panel {
+  padding: 12px;
+  overflow: auto;
+}
+
+.output-panel pre {
+  white-space: pre-wrap;
+}
+
+.shell-output-hidden [data-testid='shell-output'] {
+  display: none;
+}
