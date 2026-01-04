@@ -20,6 +20,11 @@ body {
   overflow: hidden;
 }
 
+.status {
+  padding: 12px;
+  color: #555;
+}
+
 .output-panel {
   padding: 12px;
   overflow: auto;

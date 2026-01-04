@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Shell, IframeRuntime } from '@mongosh/browser-repl';
 import { InMemoryServiceProvider } from './inMemoryServiceProvider';
 
@@ -33,9 +33,7 @@ const formatEntries = (entries: OutputEntry[]) => {
 };
 
 export const App: React.FC = () => {
-  const runtime = useMemo(() => {
-    return new IframeRuntime(new InMemoryServiceProvider() as any);
-  }, []);
+  const [runtime, setRuntime] = useState<IframeRuntime | null>(null);
 
   const [output, setOutput] = useState<OutputEntry[]>([
     {
@@ -55,25 +53,37 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    void runtime.initialize();
+    let isMounted = true;
+    const instance = new IframeRuntime(new InMemoryServiceProvider() as any);
+    void instance.initialize().then(() => {
+      if (isMounted) {
+        setRuntime(instance);
+      }
+    });
     return () => {
-      void runtime.destroy();
+      isMounted = false;
+      void instance.destroy();
+      setRuntime(null);
     };
-  }, [runtime]);
+  }, []);
 
   return (
     <div className="app">
       <div className="input-panel shell-output-hidden">
-        <Shell
-          runtime={runtime}
-          output={output}
-          history={history}
-          isOperationInProgress={isOperationInProgress}
-          onOutputChanged={handleOutputChanged}
-          onHistoryChanged={setHistory}
-          onOperationStarted={() => setIsOperationInProgress(true)}
-          onOperationEnd={() => setIsOperationInProgress(false)}
-        />
+        {runtime ? (
+          <Shell
+            runtime={runtime}
+            output={output}
+            history={history}
+            isOperationInProgress={isOperationInProgress}
+            onOutputChanged={handleOutputChanged}
+            onHistoryChanged={setHistory}
+            onOperationStarted={() => setIsOperationInProgress(true)}
+            onOperationEnd={() => setIsOperationInProgress(false)}
+          />
+        ) : (
+          <div className="status">Initializing runtime…</div>
+        )}
       </div>
       <div className="output-panel">
         <h2>Result</h2>
